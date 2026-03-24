@@ -97,6 +97,7 @@
       meta.appendChild(pathEl);
       // Clicking the meta area toggles play/stop for the same track
       meta.addEventListener('click', (e) => {
+        e.stopPropagation();
         if ((e.target instanceof HTMLElement) && e.target.closest('.heart')) return;
         if (isPlaying(file)) stopOrPause(); else playFromStart(file);
       });
@@ -133,7 +134,7 @@
       meta.appendChild(wave);
       meta.appendChild(pathEl);
       waveCanvases.set(file.path, wave);
-      // Explicitly toggle on waveform click as well
+      // Waveform click behaves like row/name (no seeking cursor move)
       wave.addEventListener('click', (e) => {
         e.stopPropagation();
         if (isPlaying(file)) stopOrPause(); else playFromStart(file);
@@ -530,8 +531,9 @@
     saveCollections();
   }
 
-  function saveFavorites() {
+  async function saveFavorites() {
     try { localStorage.setItem('favorites', JSON.stringify([...favorites])); } catch {}
+    try { await api.settingsSet('favorites', [...favorites]); } catch {}
   }
   function saveCollections() {
     try {
@@ -565,6 +567,17 @@
 
   // Load persisted favorites/collections and render sidebar initially
   loadPrefs();
+  // Also try to restore favorites from main settings (persist across sessions)
+  (async function restoreFavoritesFromSettings(){
+    try {
+      const favs = await api.settingsGet('favorites');
+      if (Array.isArray(favs)) {
+        favorites = new Set(favs);
+        renderCollectionsSidebar();
+        filter();
+      }
+    } catch {}
+  })();
   renderCollectionsSidebar();
 
   // --- AIFF decoder for PCM (NONE big-endian, sowt little-endian) ---
