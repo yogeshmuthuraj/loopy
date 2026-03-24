@@ -684,7 +684,9 @@
     // playhead
     if (progress && isFinite(progress)) {
       const x = Math.max(0, Math.min(cssWidth - 1, Math.floor(progress * cssWidth)));
-      ctx.strokeStyle = '#ffffff';
+      const root = document.documentElement;
+      const isLight = root.getAttribute('data-theme') === 'light';
+      ctx.strokeStyle = isLight ? '#000000' : '#ffffff';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(x + 0.5, 0);
