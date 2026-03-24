@@ -98,3 +98,33 @@ ipcMain.handle('start-drag', (event, filePath) => {
   const icon = nativeImage.createFromDataURL(DRAG_ICON_DATA_URL);
   event.sender.startDrag({ file: filePath, icon });
 });
+
+// Simple settings persistence in userData
+const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
+async function loadSettings() {
+  try {
+    const raw = await fs.readFile(settingsPath(), 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+async function saveSettings(obj) {
+  try {
+    await fs.mkdir(path.dirname(settingsPath()), { recursive: true });
+  } catch {}
+  await fs.writeFile(settingsPath(), JSON.stringify(obj, null, 2), 'utf8');
+}
+
+ipcMain.handle('settings-get', async (_event, key) => {
+  const s = await loadSettings();
+  return s?.[key] ?? null;
+});
+
+ipcMain.handle('settings-set', async (_event, key, value) => {
+  const s = await loadSettings();
+  if (value === undefined || value === null) delete s[key];
+  else s[key] = value;
+  await saveSettings(s);
+  return true;
+});

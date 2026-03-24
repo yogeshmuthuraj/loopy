@@ -1,8 +1,9 @@
 {
-  "name": "splice-loop-organizer",
+  "name": "loopy",
   "version": "0.1.0",
   "description": "Simple desktop Electron app to browse, search, play, and drag audio loops from a chosen folder.",
   "main": "main.js",
+  "productName": "Loopy",
   "license": "MIT",
   "author": "",
   "scripts": {

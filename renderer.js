@@ -85,10 +85,10 @@
 
       meta.appendChild(name);
       meta.appendChild(pathEl);
-      // Clicking the meta area auto-plays from start
+      // Clicking the meta area toggles play/stop for the same track
       meta.addEventListener('click', (e) => {
-        if ((e.target instanceof HTMLElement) && (e.target.closest('.play') || e.target.closest('.menu-btn') || e.target.closest('.heart'))) return;
-        playFromStart(file);
+        if ((e.target instanceof HTMLElement) && e.target.closest('.heart')) return;
+        if (isPlaying(file)) stopOrPause(); else playFromStart(file);
       });
 
       const ext = document.createElement('div');
@@ -121,7 +121,6 @@
       row.appendChild(meta);
       row.appendChild(ext);
       row.appendChild(heart);
-      row.appendChild(menu);
 
       // Set up drag & drop to OS/DAW
       row.setAttribute('draggable', 'true');
@@ -131,10 +130,10 @@
         e.dataTransfer?.setData('text/plain', file.path);
       });
 
-      meta.addEventListener('click', (e) => {
+      // Whole row toggles play/stop, except clicking heart
+      row.addEventListener('click', (e) => {
         if ((e.target instanceof HTMLElement) && e.target.closest('.heart')) return;
         if (isPlaying(file)) stopOrPause(); else playFromStart(file);
-      });
       });
 
       frag.appendChild(row);
@@ -309,6 +308,7 @@
       if (!folder) return;
       currentFolder = folder;
       try { localStorage.setItem('lastFolder', folder); } catch {}
+      try { await api.settingsSet('lastFolder', folder); } catch {}
       listEl.innerHTML = '<div class="empty">Scanning…</div>';
       all = await api.scanFolder(folder);
       renderCollectionsSidebar();
@@ -333,7 +333,8 @@
   // Restore last chosen folder if available
   (async function restoreLast() {
     let last = null;
-    try { last = localStorage.getItem('lastFolder'); } catch {}
+    try { last = await api.settingsGet('lastFolder'); } catch {}
+    if (!last) { try { last = localStorage.getItem('lastFolder'); } catch {} }
     if (!last) return;
     currentFolder = last;
     listEl.innerHTML = '<div class="empty">Scanning last folder…</div>';

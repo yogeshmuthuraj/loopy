@@ -15,4 +15,7 @@ contextBridge.exposeInMainWorld('api', {
     return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
   },
   fileExists: async (filePath) => new Promise((resolve) => fs.access(filePath, (e) => resolve(!e)))
+  ,
+  settingsGet: (key) => ipcRenderer.invoke('settings-get', key),
+  settingsSet: (key, value) => ipcRenderer.invoke('settings-set', key, value)
 });

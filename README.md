@@ -1,4 +1,4 @@
-# Splice Loop Organizer (Simple Loop Browser)
+# Loopy (Simple Loop Browser)
 
 A minimal Electron desktop app to browse a chosen folder of audio loops (including subfolders), search by name/path, preview playback, and drag files out to your OS/DAW.
 
