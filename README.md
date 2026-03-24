@@ -13,7 +13,7 @@ A minimal Electron desktop app to browse a chosen folder of audio loops (includi
 
 1) Install dependencies:
 
-   cd splice-loop-organizer
+   cd loopy
    npm install
 
 2) Start the app:
