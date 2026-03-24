@@ -37,7 +37,7 @@
       }
       header {
         display: grid;
-        grid-template-columns: auto 1fr auto auto auto;
+        grid-template-columns: auto auto 1fr auto auto auto;
         gap: 12px;
         align-items: center;
         padding: 10px 12px;
@@ -77,6 +77,8 @@
       }
       .status { color: var(--muted); font-size: 12px; }
       main { display: grid; grid-template-columns: 280px 1fr; gap: 10px; overflow: hidden; }
+      :root[data-sidebar="collapsed"] main { grid-template-columns: 1fr; }
+      :root[data-sidebar="collapsed"] aside#sidebar { display: none; }
       aside#sidebar {
         background: var(--panel);
         border: 1px solid var(--border);
@@ -147,6 +149,7 @@
   </head>
   <body>
     <header>
+      <button id="sidebarToggle" class="ghost" title="Toggle sidebar">☰</button>
       <div class="brand">Loopy</div>
       <input id="query" type="search" placeholder="Search name or path…" />
       <button id="theme" class="ghost" title="Toggle theme">🌙</button>

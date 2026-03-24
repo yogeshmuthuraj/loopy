@@ -80,9 +80,12 @@
       const name = document.createElement('div');
       name.className = 'name';
       name.textContent = file.name;
-      // Make clicking the name auto-play from start
+      // Make clicking the name toggle play/stop for this track
       name.style.cursor = 'pointer';
-      name.addEventListener('click', () => playFromStart(file));
+      name.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (isPlaying(file)) stopOrPause(); else playFromStart(file);
+      });
 
       const pathEl = document.createElement('div');
       pathEl.className = 'path';
@@ -123,6 +126,11 @@
       meta.appendChild(wave);
       meta.appendChild(pathEl);
       waveCanvases.set(file.path, wave);
+      // Explicitly toggle on waveform click as well
+      wave.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (isPlaying(file)) stopOrPause(); else playFromStart(file);
+      });
       row.appendChild(thumbEl);
       row.appendChild(meta);
       row.appendChild(ext);
@@ -377,6 +385,23 @@
     themeBtn?.addEventListener('click', () => {
       const next = (root.getAttribute('data-theme') === 'light') ? 'dark' : 'light';
       apply(next);
+    });
+  })();
+
+  // Sidebar toggle and default collapsed
+  (function initSidebar() {
+    const root = document.documentElement;
+    const btn = document.getElementById('sidebarToggle');
+    function apply(state) {
+      root.setAttribute('data-sidebar', state);
+      try { localStorage.setItem('sidebar', state); } catch {}
+    }
+    let saved = null;
+    try { saved = localStorage.getItem('sidebar'); } catch {}
+    apply(saved || 'collapsed');
+    btn?.addEventListener('click', () => {
+      const current = root.getAttribute('data-sidebar');
+      apply(current === 'collapsed' ? 'expanded' : 'collapsed');
     });
   })();
 
