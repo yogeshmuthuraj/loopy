@@ -48,6 +48,7 @@
     for (const file of items) {
       const row = document.createElement('div');
       row.className = 'item';
+      if (isPlaying(file)) row.classList.add('playing');
 
       const play = document.createElement('button');
       play.className = 'play';
@@ -68,7 +69,7 @@
         });
       }
 
-      play.addEventListener('click', () => togglePlay(file));
+      play.addEventListener('click', (e) => { e.stopPropagation(); togglePlay(file); });
 
       const meta = document.createElement('div');
       meta.className = 'meta';
@@ -88,7 +89,7 @@
       meta.appendChild(pathEl);
       // Clicking the meta area auto-plays from start
       meta.addEventListener('click', (e) => {
-        if ((e.target instanceof HTMLElement) && e.target.closest('.play')) return;
+        if ((e.target instanceof HTMLElement) && (e.target.closest('.play') || e.target.closest('.menu-btn') || e.target.closest('.heart'))) return;
         playFromStart(file);
       });
 
@@ -96,22 +97,22 @@
       ext.className = 'ext';
       ext.textContent = file.ext.toUpperCase().slice(1);
 
-      const star = document.createElement('button');
-      star.className = 'star';
-      star.title = favorites.has(file.path) ? 'Unfavorite' : 'Favorite';
-      star.textContent = favorites.has(file.path) ? '★' : '☆';
-      star.addEventListener('click', (e) => {
+      const heart = document.createElement('button');
+      heart.className = 'heart';
+      heart.title = favorites.has(file.path) ? 'Remove from Favorites' : 'Add to Favorites';
+      heart.textContent = favorites.has(file.path) ? '❤' : '♡';
+      heart.addEventListener('click', (e) => {
         e.stopPropagation();
         toggleFavorite(file.path);
-        star.textContent = favorites.has(file.path) ? '★' : '☆';
-        star.title = favorites.has(file.path) ? 'Unfavorite' : 'Favorite';
+        heart.textContent = favorites.has(file.path) ? '❤' : '♡';
+        heart.title = favorites.has(file.path) ? 'Remove from Favorites' : 'Add to Favorites';
         renderCollectionsSidebar();
         filter();
       });
 
       const menu = document.createElement('button');
       menu.className = 'menu-btn';
-      menu.textContent = '⋯';
+      menu.textContent = '⋮';
       menu.title = 'More';
       menu.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -122,7 +123,7 @@
       row.appendChild(thumbEl);
       row.appendChild(meta);
       row.appendChild(ext);
-      row.appendChild(star);
+      row.appendChild(heart);
       row.appendChild(menu);
 
       // Set up drag & drop to OS/DAW
@@ -135,7 +136,7 @@
 
       // Single click anywhere on the row (except the play button) auto-plays from start
       row.addEventListener('click', (e) => {
-        if ((e.target instanceof HTMLElement) && e.target.closest('.play')) return;
+        if ((e.target instanceof HTMLElement) && (e.target.closest('.play') || e.target.closest('.menu-btn') || e.target.closest('.heart'))) return;
         playFromStart(file);
       });
 
@@ -205,8 +206,7 @@
     stopWebAudio();
     let buffer;
     try {
-      const arr = await api.readFileBuffer(file.path);
-      buffer = await audioCtx.decodeAudioData(arr);
+      buffer = await decodeBufferForFile(file);
     } catch (e) {
       // Fallback to HTML5 if decode fails
       return toggleHtml5(file);
@@ -256,8 +256,7 @@
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     stopWebAudio();
     try {
-      const arr = await api.readFileBuffer(file.path);
-      const buffer = await audioCtx.decodeAudioData(arr);
+      const buffer = await decodeBufferForFile(file);
       const src = audioCtx.createBufferSource();
       src.buffer = buffer;
       src.connect(audioCtx.destination);
@@ -429,7 +428,7 @@
     };
 
     // Favorite toggle
-    dd.appendChild(makeItem(favorites.has(file.path) ? '★ Remove from Favorites' : '☆ Add to Favorites', () => {
+    dd.appendChild(makeItem(favorites.has(file.path) ? '❤ Remove from Favorites' : '♡ Add to Favorites', () => {
       toggleFavorite(file.path);
       renderCollectionsSidebar();
       filter();
@@ -513,4 +512,85 @@
   // Load persisted favorites/collections and render sidebar initially
   loadPrefs();
   renderCollectionsSidebar();
+
+  // --- AIFF decoder for PCM (NONE big-endian, sowt little-endian) ---
+  async function decodeAiffToBuffer(arr) {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const dv = new DataView(arr);
+    function fourCC(at) { return String.fromCharCode(dv.getUint8(at), dv.getUint8(at+1), dv.getUint8(at+2), dv.getUint8(at+3)); }
+    function readExt80(at) {
+      const exp = dv.getUint16(at, false);
+      const e = (exp & 0x7fff) - 16383;
+      const hi = dv.getUint32(at+2, false);
+      const lo = dv.getUint32(at+6, false);
+      const mant = hi * 4294967296 + lo; // 2^32
+      const sr = mant * Math.pow(2, e - 63);
+      return Math.max(1, Math.round(sr));
+    }
+    if (fourCC(0) !== 'FORM') throw new Error('Not AIFF');
+    const formType = fourCC(8);
+    const isAIFC = formType === 'AIFC';
+    let pos = 12;
+    let numCh = 0, numFrames = 0, bps = 0, sr = 44100, comp = 'NONE';
+    let ssndPos = 0, ssndSize = 0, ssndOffset = 0;
+    while (pos + 8 <= dv.byteLength) {
+      const id = fourCC(pos);
+      const size = dv.getUint32(pos+4, false);
+      const dataStart = pos + 8;
+      if (id === 'COMM') {
+        numCh = dv.getUint16(dataStart, false);
+        numFrames = dv.getUint32(dataStart+2, false);
+        bps = dv.getUint16(dataStart+6, false);
+        sr = readExt80(dataStart+8);
+        if (isAIFC && size >= 22) {
+          comp = fourCC(dataStart+18);
+        }
+      } else if (id === 'SSND') {
+        ssndOffset = dv.getUint32(dataStart, false);
+        /* const blockSize = */ dv.getUint32(dataStart+4, false);
+        ssndPos = dataStart + 8 + ssndOffset;
+        ssndSize = size - 8 - ssndOffset;
+      }
+      pos = dataStart + size + (size % 2);
+    }
+    if (!numCh || !numFrames || !bps || !ssndPos) throw new Error('Invalid AIFF');
+    if (bps !== 16) throw new Error('Only 16-bit PCM supported');
+    const bytesPerSample = 2;
+    const frameBytes = bytesPerSample * numCh;
+    const totalNeeded = numFrames * frameBytes;
+    if (ssndPos + totalNeeded > dv.byteLength) {
+      // Clamp frames to available data
+      numFrames = Math.floor((dv.byteLength - ssndPos) / frameBytes);
+    }
+    const buffer = audioCtx.createBuffer(numCh, numFrames, sr);
+    for (let ch = 0; ch < numCh; ch++) {
+      const chData = buffer.getChannelData(ch);
+      let p = ssndPos + ch * bytesPerSample;
+      for (let i = 0; i < numFrames; i++, p += frameBytes) {
+        let v;
+        if (comp === 'sowt') {
+          v = dv.getInt16(p, true);
+        } else { // NONE (big-endian)
+          v = dv.getInt16(p, false);
+        }
+        chData[i] = Math.max(-1, v / 32768);
+      }
+    }
+    return buffer;
+  }
+
+  async function decodeBufferForFile(file) {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ext = file.ext.toLowerCase();
+    const arr = await api.readFileBuffer(file.path);
+    if (ext === '.aif' || ext === '.aiff') {
+      return decodeAiffToBuffer(arr);
+    }
+    try {
+      return await audioCtx.decodeAudioData(arr);
+    } catch (e) {
+      // last resort: try AIFF path
+      return decodeAiffToBuffer(arr);
+    }
+  }
 })();

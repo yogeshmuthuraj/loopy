@@ -90,8 +90,8 @@
       .side-title { font-weight: 700; font-size: 13px; }
       .side-controls { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
       .side-controls input { background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
-      .collections { overflow: auto; display: grid; gap: 6px; }
-      .col-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+      .collections { overflow: auto; display: grid; gap: 4px; }
+      .col-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 12px; }
       .col-item:hover { background: rgba(255,255,255,0.05); }
       :root[data-theme="light"] .col-item:hover { background: rgba(0,0,0,0.05); }
       .col-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -114,6 +114,8 @@
         border-radius: 6px;
       }
       .item:hover { background: rgba(255,255,255,0.03); }
+      .item.playing { background: rgba(79,140,255,0.15); border-left: 3px solid var(--accent); }
+      :root[data-theme="light"] .item.playing { background: rgba(37,99,235,0.12); }
       :root[data-theme="light"] .item:hover { background: rgba(0,0,0,0.03); }
       .play {
         width: 20px; height: 20px; border-radius: 50%;
@@ -130,7 +132,7 @@
       .dropdown .item { border: 0; padding: 8px 10px; grid-template-columns: 1fr; }
       .dropdown .item:hover { background: rgba(255,255,255,0.06); }
       :root[data-theme="light"] .dropdown .item:hover { background: rgba(0,0,0,0.06); }
-      .star { background: transparent; border: none; cursor: pointer; font-size: 14px; }
+      .heart { background: transparent; border: none; cursor: pointer; font-size: 18px; line-height: 1; }
       footer { padding: 8px 12px; border: 1px solid var(--border); border-top: 1px solid var(--border); background: var(--panel); display: grid; gap: 6px; border-radius: 10px; }
       footer { margin-bottom: 10px; } /* extra blank space at bottom */
       #now { color: var(--muted); font-size: 12px; }
