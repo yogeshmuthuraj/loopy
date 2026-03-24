@@ -18,4 +18,6 @@ contextBridge.exposeInMainWorld('api', {
   ,
   settingsGet: (key) => ipcRenderer.invoke('settings-get', key),
   settingsSet: (key, value) => ipcRenderer.invoke('settings-set', key, value)
+  ,
+  inferMeta: (items) => ipcRenderer.invoke('infer-meta', items)
 });

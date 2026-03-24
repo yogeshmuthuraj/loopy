@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require('electron');
 const path = require('path');
-const fs = require('fs').promises;
+const fsp = require('fs').promises;
+const fs = require('fs');
 
 // Tiny 16x16 transparent PNG as drag icon (base64)
 const DRAG_ICON_DATA_URL =
@@ -22,7 +23,7 @@ async function scanAudioFiles(rootDir) {
   async function walk(currentDir) {
     let entries = [];
     try {
-      entries = await fs.readdir(currentDir, { withFileTypes: true });
+      entries = await fsp.readdir(currentDir, { withFileTypes: true });
     } catch (e) {
       return; // skip unreadable dirs
     }
@@ -46,6 +47,28 @@ async function scanAudioFiles(rootDir) {
   results.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
   return results;
 }
+
+// Try to extract simple metadata (duration using HTML5 renderer will be known at play; here estimate by reading headers if possible)
+// For a quick MVP, we attempt to parse tempo, key from filenames like "..._120BPM_Cmin.wav" or "... 128 bpm Am ..."
+function parseNameMeta(fileName) {
+  const base = fileName.replace(/\.[^.]+$/, '');
+  let bpm = null; let key = null;
+  const bpmMatch = base.match(/(\d{2,3})\s*BPM/i) || base.match(/(\d{2,3})\s*bpm/i) || base.match(/_(\d{2,3})(?:bpm)?_/i);
+  if (bpmMatch) bpm = parseInt(bpmMatch[1], 10);
+  const keyMatch = base.match(/\b([A-G](?:#|b)?m?)\b/i);
+  if (keyMatch) key = keyMatch[1].toUpperCase();
+  return { bpm, key };
+}
+
+ipcMain.handle('infer-meta', async (_event, items) => {
+  // items: Array<{name,path,relPath,ext}>
+  // Return map path -> { bpm, key }
+  const out = {};
+  for (const it of items || []) {
+    out[it.path] = parseNameMeta(it.name);
+  }
+  return out;
+});
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -103,7 +126,7 @@ ipcMain.handle('start-drag', (event, filePath) => {
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
 async function loadSettings() {
   try {
-    const raw = await fs.readFile(settingsPath(), 'utf8');
+    const raw = await fsp.readFile(settingsPath(), 'utf8');
     return JSON.parse(raw);
   } catch {
     return {};
@@ -111,9 +134,9 @@ async function loadSettings() {
 }
 async function saveSettings(obj) {
   try {
-    await fs.mkdir(path.dirname(settingsPath()), { recursive: true });
+    await fsp.mkdir(path.dirname(settingsPath()), { recursive: true });
   } catch {}
-  await fs.writeFile(settingsPath(), JSON.stringify(obj, null, 2), 'utf8');
+  await fsp.writeFile(settingsPath(), JSON.stringify(obj, null, 2), 'utf8');
 }
 
 ipcMain.handle('settings-get', async (_event, key) => {

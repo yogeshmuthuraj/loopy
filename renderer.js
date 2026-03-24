@@ -103,6 +103,19 @@
       ext.className = 'ext';
       ext.textContent = file.ext.toUpperCase().slice(1);
 
+      // badges (format, BPM, Key, Time)
+      const badges = document.createElement('div');
+      badges.className = 'badges';
+      const bFormat = document.createElement('span'); bFormat.className = 'badge muted'; bFormat.textContent = ext.textContent;
+      const bBpm = document.createElement('span'); bBpm.className = 'badge'; bBpm.textContent = '';
+      const bKey = document.createElement('span'); bKey.className = 'badge'; bKey.textContent = '';
+      const bTime = document.createElement('span'); bTime.className = 'badge'; bTime.textContent = '';
+      badges.appendChild(bFormat);
+      badges.appendChild(bBpm);
+      badges.appendChild(bKey);
+      badges.appendChild(bTime);
+      meta.appendChild(badges);
+
       const heart = document.createElement('button');
       heart.className = 'heart';
       heart.title = favorites.has(file.path) ? 'Remove from Favorites' : 'Add to Favorites';
@@ -153,6 +166,18 @@
       frag.appendChild(row);
       // Render waveform asynchronously
       renderWaveFor(file, wave);
+      // After first render, infer bpm/key from filename and fill in badges
+      ;(async () => {
+        try {
+          const metaMap = await api.inferMeta([file]);
+          const m = metaMap[file.path] || {};
+          bBpm.textContent = m.bpm ? `${m.bpm} BPM` : '';
+          bKey.textContent = m.key ? `${m.key}` : '';
+          // duration badge will be set when we decode peaks (approx using waveDurations)
+          const dur = waveDurations.get(file.path);
+          if (dur) bTime.textContent = formatTime(dur);
+        } catch {}
+      })();
     }
     listEl.appendChild(frag);
   }
@@ -718,6 +743,13 @@
       ctx.lineTo(x + 0.5, cssHeight);
       ctx.stroke();
     }
+  }
+
+  function formatTime(sec) {
+    const s = Math.max(0, Math.round(sec));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${r.toString().padStart(2,'0')}`;
   }
 
   function getProgress() {
