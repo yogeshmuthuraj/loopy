@@ -27,6 +27,11 @@
   const thumbs = new Map();
   const imageExts = ['.jpg', '.jpeg', '.png', '.webp'];
   const waveCache = new Map(); // path -> Float32Array peaks
+  const waveCanvases = new Map(); // path -> canvas element
+  const waveDurations = new Map(); // path -> seconds
+  let rafId = 0;
+  let webStartTime = 0; // when WebAudio started
+  let webDuration = 0; // duration of current WebAudio buffer
 
   function isPlaying(file) {
     if (currentPlayingPath !== file.path) return false;
@@ -117,6 +122,7 @@
       wave.className = 'wave';
       meta.appendChild(wave);
       meta.appendChild(pathEl);
+      waveCanvases.set(file.path, wave);
       row.appendChild(thumbEl);
       row.appendChild(meta);
       row.appendChild(ext);
@@ -231,6 +237,9 @@
     playingMode = 'webaudio';
     currentSource = src;
     try { src.start(0); } catch {}
+    webDuration = buffer.duration || 0;
+    webStartTime = audioCtx.currentTime;
+    ensureRaf();
     filter();
   }
 
@@ -277,6 +286,9 @@
       playingMode = 'webaudio';
       currentSource = src;
       try { src.start(0); } catch {}
+      webDuration = buffer.duration || 0;
+      webStartTime = audioCtx.currentTime;
+      ensureRaf();
       filter();
     } catch (e) {
       // fallback
@@ -298,6 +310,7 @@
       playingMode = 'html5';
       player.play().catch(() => {});
     }
+    ensureRaf();
     filter();
   }
 
@@ -321,7 +334,7 @@
   queryInput.addEventListener('input', filter);
 
   // Keep UI in sync with HTML5 player state
-  player.addEventListener('play', () => { playingMode = 'html5'; filter(); });
+  player.addEventListener('play', () => { playingMode = 'html5'; ensureRaf(); filter(); });
   player.addEventListener('pause', () => { if (!player.src) return; filter(); });
   player.addEventListener('ended', () => { filter(); });
   player.addEventListener('error', () => {
@@ -611,8 +624,9 @@
         const buffer = await decodeBufferForFile(file);
         peaks = computePeaks(buffer, 400);
         waveCache.set(file.path, peaks);
+        waveDurations.set(file.path, buffer.duration || 0);
       }
-      drawWave(canvas, peaks);
+      drawWave(canvas, peaks, 0);
     } catch {
       // ignore drawing errors
     }
@@ -635,7 +649,7 @@
     return out;
   }
 
-  function drawWave(canvas, peaks) {
+  function drawWave(canvas, peaks, progress = 0) {
     const dpr = window.devicePixelRatio || 1;
     const cssWidth = canvas.clientWidth || 300;
     const cssHeight = canvas.clientHeight || 28;
@@ -667,5 +681,48 @@
       const y = Math.floor((cssHeight - h) / 2);
       ctx.fillRect(x, y, barW, h);
     }
+    // playhead
+    if (progress && isFinite(progress)) {
+      const x = Math.max(0, Math.min(cssWidth - 1, Math.floor(progress * cssWidth)));
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, cssHeight);
+      ctx.stroke();
+    }
+  }
+
+  function getProgress() {
+    if (!currentPlayingPath) return 0;
+    if (playingMode === 'html5') {
+      const d = player.duration || 0;
+      if (d > 0) return Math.max(0, Math.min(1, (player.currentTime || 0) / d));
+      return 0;
+    } else if (playingMode === 'webaudio') {
+      const dur = webDuration || waveDurations.get(currentPlayingPath) || 0;
+      if (dur > 0 && audioCtx) {
+        const p = (audioCtx.currentTime - webStartTime) / dur;
+        return Math.max(0, Math.min(1, p));
+      }
+      return 0;
+    }
+    return 0;
+  }
+
+  function rafTick() {
+    rafId = 0;
+    const canvas = waveCanvases.get(currentPlayingPath || '');
+    const peaks = waveCache.get(currentPlayingPath || '');
+    if (canvas && peaks) {
+      drawWave(canvas, peaks, getProgress());
+    }
+    const keep = (playingMode === 'html5' && !player.paused && !!player.src) ||
+                 (playingMode === 'webaudio' && !!currentSource);
+    if (keep) rafId = requestAnimationFrame(rafTick);
+  }
+
+  function ensureRaf() {
+    if (!rafId) rafId = requestAnimationFrame(rafTick);
   }
 })();
