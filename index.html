@@ -44,6 +44,7 @@
         border-bottom: 1px solid var(--border);
         background: var(--panel);
         border-radius: 10px;
+        margin-top: 10px; /* extra blank space on top */
       }
       button.primary {
         background: var(--accent);
@@ -75,7 +76,26 @@
         background: #f3f4f6;
       }
       .status { color: var(--muted); font-size: 12px; }
-      main { display: grid; grid-template-columns: 1fr; overflow: hidden; }
+      main { display: grid; grid-template-columns: 280px 1fr; gap: 10px; overflow: hidden; }
+      aside#sidebar {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px;
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        gap: 10px;
+        min-width: 0;
+      }
+      .side-title { font-weight: 700; font-size: 13px; }
+      .side-controls { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+      .side-controls input { background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+      .collections { overflow: auto; display: grid; gap: 6px; }
+      .col-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+      .col-item:hover { background: rgba(255,255,255,0.05); }
+      :root[data-theme="light"] .col-item:hover { background: rgba(0,0,0,0.05); }
+      .col-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .col-count { color: var(--muted); font-size: 12px; }
       #list {
         overflow: auto;
         padding: 8px;
@@ -85,7 +105,7 @@
       }
       .item {
         display: grid;
-        grid-template-columns: 26px 1fr auto;
+        grid-template-columns: 26px 26px 1fr auto auto;
         gap: 10px;
         align-items: center;
         padding: 8px 12px;
@@ -104,7 +124,15 @@
       .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .path { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ext { color: var(--muted); font-size: 12px; padding-left: 8px; }
+      .thumb { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; background: #2b2f3a; display: inline-block; }
+      .menu-btn { background: transparent; color: var(--text); border: 1px solid var(--border); padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+      .dropdown { position: fixed; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); min-width: 200px; z-index: 9999; }
+      .dropdown .item { border: 0; padding: 8px 10px; grid-template-columns: 1fr; }
+      .dropdown .item:hover { background: rgba(255,255,255,0.06); }
+      :root[data-theme="light"] .dropdown .item:hover { background: rgba(0,0,0,0.06); }
+      .star { background: transparent; border: none; cursor: pointer; font-size: 14px; }
       footer { padding: 8px 12px; border: 1px solid var(--border); border-top: 1px solid var(--border); background: var(--panel); display: grid; gap: 6px; border-radius: 10px; }
+      footer { margin-bottom: 10px; } /* extra blank space at bottom */
       #now { color: var(--muted); font-size: 12px; }
       audio { width: 100%; }
       .empty { padding: 24px; color: var(--muted); }
@@ -120,6 +148,18 @@
       <div id="count" class="status">0 items</div>
     </header>
     <main>
+      <aside id="sidebar">
+        <div class="side-title">Collections</div>
+        <div class="side-controls">
+          <input id="new-col" placeholder="New collection name" />
+          <button id="add-col" class="ghost">Add</button>
+        </div>
+        <div class="collections" id="collections">
+          <div class="col-item" data-filter="all"><span class="col-name">All</span><span class="col-count" id="count-all">0</span></div>
+          <div class="col-item" data-filter="favorites"><span class="col-name">Favorites</span><span class="col-count" id="count-fav">0</span></div>
+          <!-- dynamic collections below -->
+        </div>
+      </aside>
       <div id="list" aria-label="Audio loops list"></div>
     </main>
     <footer>
