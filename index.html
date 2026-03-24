@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Loop Browser</title>
+    <title>Loopy</title>
     <style>
       :root {
         --bg: #0f1115;
@@ -14,6 +14,15 @@
         --accent-2: #23c483;
         --border: #232732;
       }
+      :root[data-theme="light"] {
+        --bg: #f7f8fa;
+        --panel: #ffffff;
+        --muted: #667085;
+        --text: #0b0f19;
+        --accent: #2563eb;
+        --accent-2: #16a34a;
+        --border: #d0d5dd;
+      }
       * { box-sizing: border-box; }
       body {
         margin: 0;
@@ -23,14 +32,18 @@
         height: 100vh;
         display: grid;
         grid-template-rows: auto 1fr auto;
+        padding: 12px; /* spacing on all 4 sides */
+        gap: 10px;
       }
       header {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto 1fr auto auto auto;
         gap: 12px;
         align-items: center;
         padding: 10px 12px;
         border-bottom: 1px solid var(--border);
         background: var(--panel);
+        border-radius: 10px;
       }
       button.primary {
         background: var(--accent);
@@ -39,6 +52,14 @@
         padding: 8px 12px;
         border-radius: 6px;
         font-weight: 600;
+        cursor: pointer;
+      }
+      button.ghost {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+        padding: 6px 10px;
+        border-radius: 6px;
         cursor: pointer;
       }
       button.primary:disabled { opacity: 0.6; cursor: default; }
@@ -50,11 +71,17 @@
         padding: 8px 10px;
         border-radius: 6px;
       }
+      :root[data-theme="light"] input[type="search"] {
+        background: #f3f4f6;
+      }
       .status { color: var(--muted); font-size: 12px; }
       main { display: grid; grid-template-columns: 1fr; overflow: hidden; }
       #list {
         overflow: auto;
-        padding: 8px 0;
+        padding: 8px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
       }
       .item {
         display: grid;
@@ -64,8 +91,10 @@
         padding: 8px 12px;
         border-bottom: 1px solid var(--border);
         cursor: default;
+        border-radius: 6px;
       }
       .item:hover { background: rgba(255,255,255,0.03); }
+      :root[data-theme="light"] .item:hover { background: rgba(0,0,0,0.03); }
       .play {
         width: 20px; height: 20px; border-radius: 50%;
         display: grid; place-items: center;
@@ -75,16 +104,19 @@
       .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .path { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .ext { color: var(--muted); font-size: 12px; padding-left: 8px; }
-      footer { padding: 8px 12px; border-top: 1px solid var(--border); background: var(--panel); display: grid; gap: 6px; }
+      footer { padding: 8px 12px; border: 1px solid var(--border); border-top: 1px solid var(--border); background: var(--panel); display: grid; gap: 6px; border-radius: 10px; }
       #now { color: var(--muted); font-size: 12px; }
       audio { width: 100%; }
       .empty { padding: 24px; color: var(--muted); }
+      .brand { font-weight: 800; font-size: 16px; letter-spacing: 0.3px; }
     </style>
   </head>
   <body>
     <header>
-      <button id="choose" class="primary">Choose Folder…</button>
+      <div class="brand">Loopy</div>
       <input id="query" type="search" placeholder="Search name or path…" />
+      <button id="theme" class="ghost" title="Toggle theme">🌙</button>
+      <button id="choose" class="primary">Choose Folder…</button>
       <div id="count" class="status">0 items</div>
     </header>
     <main>

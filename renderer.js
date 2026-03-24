@@ -6,6 +6,7 @@
   const listEl = document.getElementById('list');
   const player = document.getElementById('player');
   const nowEl = document.getElementById('now');
+  const themeBtn = document.getElementById('theme');
 
   /** @type {Array<{name:string,path:string,relPath:string,ext:string}>} */
   let all = [];
@@ -49,9 +50,9 @@
       const name = document.createElement('div');
       name.className = 'name';
       name.textContent = file.name;
-      // Make clicking the name also play/pause
+      // Make clicking the name auto-play from start
       name.style.cursor = 'pointer';
-      name.addEventListener('click', () => togglePlay(file));
+      name.addEventListener('click', () => playFromStart(file));
 
       const pathEl = document.createElement('div');
       pathEl.className = 'path';
@@ -59,11 +60,10 @@
 
       meta.appendChild(name);
       meta.appendChild(pathEl);
-      // Clicking anywhere in the meta area toggles playback
+      // Clicking the meta area auto-plays from start
       meta.addEventListener('click', (e) => {
-        // Avoid double-trigger when clicking the play button itself
         if ((e.target instanceof HTMLElement) && e.target.closest('.play')) return;
-        togglePlay(file);
+        playFromStart(file);
       });
 
       const ext = document.createElement('div');
@@ -82,13 +82,10 @@
         e.dataTransfer?.setData('text/plain', file.path);
       });
 
-      // Double click to quick play
-      row.addEventListener('dblclick', () => {
-        if (currentPlayingPath === file.path && !player.paused) {
-          player.currentTime = 0; // restart
-        } else {
-          playFile(file);
-        }
+      // Single click anywhere on the row (except the play button) auto-plays from start
+      row.addEventListener('click', (e) => {
+        if ((e.target instanceof HTMLElement) && e.target.closest('.play')) return;
+        playFromStart(file);
       });
 
       frag.appendChild(row);
@@ -118,6 +115,14 @@
 
   function togglePlay(file) {
     playFile(file);
+  }
+
+  function playFromStart(file) {
+    const ext = file.ext.toLowerCase();
+    if (ext === '.aif' || ext === '.aiff') {
+      return startWebAudio(file);
+    }
+    return startHtml5(file);
   }
 
   function stopWebAudio() {
@@ -188,6 +193,51 @@
     filter();
   }
 
+  // Always (re)start from the beginning using WebAudio
+  async function startWebAudio(file) {
+    if (playingMode === 'html5' && !player.paused) player.pause();
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    stopWebAudio();
+    try {
+      const arr = await api.readFileBuffer(file.path);
+      const buffer = await audioCtx.decodeAudioData(arr);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(audioCtx.destination);
+      src.onended = () => {
+        currentSource = null;
+        if (playingMode === 'webaudio') playingMode = null;
+        filter();
+      };
+      currentPlayingPath = file.path;
+      nowEl.textContent = file.relPath;
+      playingMode = 'webaudio';
+      currentSource = src;
+      try { src.start(0); } catch {}
+      filter();
+    } catch (e) {
+      // fallback
+      toggleHtml5(file);
+    }
+  }
+
+  // Always (re)start from the beginning using HTML5 audio
+  function startHtml5(file) {
+    const fileUrl = api.toFileUrl(file.path);
+    if (playingMode === 'webaudio') stopWebAudio();
+    if (currentPlayingPath === file.path && playingMode === 'html5') {
+      try { player.currentTime = 0; } catch {}
+      player.play().catch(() => {});
+    } else {
+      player.src = fileUrl;
+      currentPlayingPath = file.path;
+      nowEl.textContent = file.relPath;
+      playingMode = 'html5';
+      player.play().catch(() => {});
+    }
+    filter();
+  }
+
   chooseBtn.addEventListener('click', async () => {
     chooseBtn.disabled = true;
     try {
@@ -228,5 +278,26 @@
       all = [];
     }
     filter();
+  })();
+
+  // Theme toggle and persistence
+  (function initTheme() {
+    const root = document.documentElement;
+    function apply(theme) {
+      root.setAttribute('data-theme', theme);
+      themeBtn.textContent = theme === 'light' ? '☀️' : '🌙';
+      try { localStorage.setItem('theme', theme); } catch {}
+    }
+    let saved = null;
+    try { saved = localStorage.getItem('theme'); } catch {}
+    if (!saved) {
+      const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+      saved = prefersLight ? 'light' : 'dark';
+    }
+    apply(saved);
+    themeBtn?.addEventListener('click', () => {
+      const next = (root.getAttribute('data-theme') === 'light') ? 'dark' : 'light';
+      apply(next);
+    });
   })();
 })();
