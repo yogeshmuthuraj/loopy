@@ -26,6 +26,7 @@
   // Thumbnails cache: path -> imagePath
   const thumbs = new Map();
   const imageExts = ['.jpg', '.jpeg', '.png', '.webp'];
+  const waveCache = new Map(); // path -> Float32Array peaks
 
   function isPlaying(file) {
     if (currentPlayingPath !== file.path) return false;
@@ -101,11 +102,13 @@
       heart.className = 'heart';
       heart.title = favorites.has(file.path) ? 'Remove from Favorites' : 'Add to Favorites';
       heart.textContent = favorites.has(file.path) ? '❤' : '♡';
+      heart.classList.toggle('active', favorites.has(file.path));
       heart.addEventListener('click', (e) => {
         e.stopPropagation();
         toggleFavorite(file.path);
         heart.textContent = favorites.has(file.path) ? '❤' : '♡';
         heart.title = favorites.has(file.path) ? 'Remove from Favorites' : 'Add to Favorites';
+        heart.classList.toggle('active', favorites.has(file.path));
         renderCollectionsSidebar();
         filter();
       });
@@ -119,7 +122,11 @@
         openMenuForFile(file, e);
       });
 
-      row.appendChild(play);
+      // Waveform canvas below the name
+      const wave = document.createElement('canvas');
+      wave.className = 'wave';
+      meta.appendChild(wave);
+      meta.appendChild(pathEl);
       row.appendChild(thumbEl);
       row.appendChild(meta);
       row.appendChild(ext);
@@ -141,6 +148,8 @@
       });
 
       frag.appendChild(row);
+      // Render waveform asynchronously
+      renderWaveFor(file, wave);
     }
     listEl.appendChild(frag);
   }
@@ -591,6 +600,72 @@
     } catch (e) {
       // last resort: try AIFF path
       return decodeAiffToBuffer(arr);
+    }
+  }
+
+  // --- Waveform generation and drawing ---
+  async function renderWaveFor(file, canvas) {
+    try {
+      let peaks = waveCache.get(file.path);
+      if (!peaks) {
+        const buffer = await decodeBufferForFile(file);
+        peaks = computePeaks(buffer, 400);
+        waveCache.set(file.path, peaks);
+      }
+      drawWave(canvas, peaks);
+    } catch {
+      // ignore drawing errors
+    }
+  }
+
+  function computePeaks(audioBuffer, buckets) {
+    const ch0 = audioBuffer.getChannelData(0);
+    const len = ch0.length;
+    const step = Math.max(1, Math.floor(len / buckets));
+    const out = new Float32Array(buckets);
+    let oi = 0;
+    for (let i = 0; i < len && oi < buckets; i += step, oi++) {
+      let sum = 0;
+      let n = 0;
+      const end = Math.min(len, i + step);
+      for (let j = i; j < end; j++) { const v = ch0[j]; sum += v * v; n++; }
+      const rms = Math.sqrt(sum / Math.max(1, n));
+      out[oi] = rms;
+    }
+    return out;
+  }
+
+  function drawWave(canvas, peaks) {
+    const dpr = window.devicePixelRatio || 1;
+    const cssWidth = canvas.clientWidth || 300;
+    const cssHeight = canvas.clientHeight || 28;
+    canvas.width = Math.max(1, Math.floor(cssWidth * dpr));
+    canvas.height = Math.max(1, Math.floor(cssHeight * dpr));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    const style = getComputedStyle(document.documentElement);
+    const accent = (style.getPropertyValue('--accent') || '#4f8cff').trim();
+    const muted = (style.getPropertyValue('--muted') || '#a0a4ae').trim();
+    // clear
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+    // midline
+    ctx.strokeStyle = muted;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, cssHeight / 2);
+    ctx.lineTo(cssWidth, cssHeight / 2);
+    ctx.stroke();
+    // bars
+    const n = peaks.length;
+    const barW = Math.max(1, Math.floor(cssWidth / n));
+    ctx.fillStyle = accent;
+    for (let i = 0; i < n; i++) {
+      const amp = Math.min(1, peaks[i]);
+      const h = Math.max(1, Math.floor(amp * (cssHeight - 4)));
+      const x = Math.floor(i * cssWidth / n);
+      const y = Math.floor((cssHeight - h) / 2);
+      ctx.fillRect(x, y, barW, h);
     }
   }
 })();
