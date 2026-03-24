@@ -1,0 +1,14 @@
+{
+  "name": "splice-loop-organizer",
+  "version": "0.1.0",
+  "description": "Simple desktop Electron app to browse, search, play, and drag audio loops from a chosen folder.",
+  "main": "main.js",
+  "license": "MIT",
+  "author": "",
+  "scripts": {
+    "start": "env -u ELECTRON_RUN_AS_NODE electron ."
+  },
+  "devDependencies": {
+    "electron": "^30.0.0"
+  }
+}

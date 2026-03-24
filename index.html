@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Loop Browser</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --panel: #171a21;
+        --muted: #a0a4ae;
+        --text: #e6e8ee;
+        --accent: #4f8cff;
+        --accent-2: #23c483;
+        --border: #232732;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        height: 100vh;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+      }
+      header {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+      button.primary {
+        background: var(--accent);
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.primary:disabled { opacity: 0.6; cursor: default; }
+      input[type="search"] {
+        flex: 1;
+        background: #0c0e12;
+        color: var(--text);
+        border: 1px solid var(--border);
+        padding: 8px 10px;
+        border-radius: 6px;
+      }
+      .status { color: var(--muted); font-size: 12px; }
+      main { display: grid; grid-template-columns: 1fr; overflow: hidden; }
+      #list {
+        overflow: auto;
+        padding: 8px 0;
+      }
+      .item {
+        display: grid;
+        grid-template-columns: 26px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+        cursor: default;
+      }
+      .item:hover { background: rgba(255,255,255,0.03); }
+      .play {
+        width: 20px; height: 20px; border-radius: 50%;
+        display: grid; place-items: center;
+        color: #fff; background: #2b2f3a; font-size: 12px;
+      }
+      .meta { display: flex; flex-direction: column; min-width: 0; }
+      .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .path { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .ext { color: var(--muted); font-size: 12px; padding-left: 8px; }
+      footer { padding: 8px 12px; border-top: 1px solid var(--border); background: var(--panel); display: grid; gap: 6px; }
+      #now { color: var(--muted); font-size: 12px; }
+      audio { width: 100%; }
+      .empty { padding: 24px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <button id="choose" class="primary">Choose Folder…</button>
+      <input id="query" type="search" placeholder="Search name or path…" />
+      <div id="count" class="status">0 items</div>
+    </header>
+    <main>
+      <div id="list" aria-label="Audio loops list"></div>
+    </main>
+    <footer>
+      <div id="now">No file selected</div>
+      <audio id="player" controls preload="none"></audio>
+    </footer>
+
+    <script src="renderer.js"></script>
+  </body>
+  </html>
