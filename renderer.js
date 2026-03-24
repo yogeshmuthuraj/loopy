@@ -51,10 +51,7 @@
       row.className = 'item';
       if (isPlaying(file)) row.classList.add('playing');
 
-      const play = document.createElement('button');
-      play.className = 'play';
-      play.title = 'Play/Pause';
-      play.textContent = isPlaying(file) ? '❚❚' : '▶';
+      // play button removed; row click handles toggle
       const thumbEl = document.createElement('img');
       thumbEl.className = 'thumb';
       const cached = thumbs.get(file.path);
@@ -70,7 +67,7 @@
         });
       }
 
-      play.addEventListener('click', (e) => { e.stopPropagation(); togglePlay(file); });
+      // no explicit play button; interactions on row/meta/name
 
       const meta = document.createElement('div');
       meta.className = 'meta';
@@ -113,14 +110,7 @@
         filter();
       });
 
-      const menu = document.createElement('button');
-      menu.className = 'menu-btn';
-      menu.textContent = '⋮';
-      menu.title = 'More';
-      menu.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openMenuForFile(file, e);
-      });
+      // menu removed per request
 
       // Waveform canvas below the name
       const wave = document.createElement('canvas');
@@ -141,10 +131,10 @@
         e.dataTransfer?.setData('text/plain', file.path);
       });
 
-      // Single click anywhere on the row (except the play button) auto-plays from start
-      row.addEventListener('click', (e) => {
-        if ((e.target instanceof HTMLElement) && (e.target.closest('.play') || e.target.closest('.menu-btn') || e.target.closest('.heart'))) return;
-        playFromStart(file);
+      meta.addEventListener('click', (e) => {
+        if ((e.target instanceof HTMLElement) && e.target.closest('.heart')) return;
+        if (isPlaying(file)) stopOrPause(); else playFromStart(file);
+      });
       });
 
       frag.appendChild(row);
@@ -199,6 +189,15 @@
     }
     currentSource = null;
     if (playingMode === 'webaudio') playingMode = null;
+  }
+
+  function stopOrPause() {
+    if (playingMode === 'html5') {
+      try { player.pause(); } catch {}
+    } else if (playingMode === 'webaudio') {
+      stopWebAudio();
+    }
+    filter();
   }
 
   async function toggleWebAudio(file) {
