@@ -29,6 +29,8 @@
   const waveCache = new Map(); // path -> Float32Array peaks
   const waveCanvases = new Map(); // path -> canvas element
   const waveDurations = new Map(); // path -> seconds
+  const bufferCache = new Map(); // path -> AudioBuffer
+  const pausedOffsets = new Map(); // path -> seconds
   let rafId = 0;
   let webStartTime = 0; // when WebAudio started
   let webDuration = 0; // duration of current WebAudio buffer
@@ -103,18 +105,10 @@
       ext.className = 'ext';
       ext.textContent = file.ext.toUpperCase().slice(1);
 
-      // badges (format, BPM, Key, Time)
-      const badges = document.createElement('div');
-      badges.className = 'badges';
-      const bFormat = document.createElement('span'); bFormat.className = 'badge muted'; bFormat.textContent = ext.textContent;
-      const bBpm = document.createElement('span'); bBpm.className = 'badge'; bBpm.textContent = '';
-      const bKey = document.createElement('span'); bKey.className = 'badge'; bKey.textContent = '';
-      const bTime = document.createElement('span'); bTime.className = 'badge'; bTime.textContent = '';
-      badges.appendChild(bFormat);
-      badges.appendChild(bBpm);
-      badges.appendChild(bKey);
-      badges.appendChild(bTime);
-      meta.appendChild(badges);
+      // time near heart
+      const timeEl = document.createElement('div');
+      timeEl.className = 'ext';
+      timeEl.textContent = '';
 
       const heart = document.createElement('button');
       heart.className = 'heart';
@@ -147,6 +141,7 @@
       row.appendChild(thumbEl);
       row.appendChild(meta);
       row.appendChild(ext);
+      row.appendChild(timeEl);
       row.appendChild(heart);
 
       // Set up drag & drop to OS/DAW
@@ -164,20 +159,11 @@
       });
 
       frag.appendChild(row);
-      // Render waveform asynchronously
-      renderWaveFor(file, wave);
-      // After first render, infer bpm/key from filename and fill in badges
-      ;(async () => {
-        try {
-          const metaMap = await api.inferMeta([file]);
-          const m = metaMap[file.path] || {};
-          bBpm.textContent = m.bpm ? `${m.bpm} BPM` : '';
-          bKey.textContent = m.key ? `${m.key}` : '';
-          // duration badge will be set when we decode peaks (approx using waveDurations)
-          const dur = waveDurations.get(file.path);
-          if (dur) bTime.textContent = formatTime(dur);
-        } catch {}
-      })();
+      // Render waveform asynchronously and fill time when known
+      renderWaveFor(file, wave).then(() => {
+        const dur = waveDurations.get(file.path);
+        if (dur) timeEl.textContent = formatTime(dur);
+      });
     }
     listEl.appendChild(frag);
   }
@@ -215,9 +201,9 @@
   function playFromStart(file) {
     const ext = file.ext.toLowerCase();
     if (ext === '.aif' || ext === '.aiff') {
-      return startWebAudio(file);
+      return startWebAudioAtOffset(file, 0);
     }
-    return startHtml5(file);
+    return startHtml5AtOffset(file, 0);
   }
 
   function stopWebAudio() {
@@ -233,15 +219,27 @@
     if (playingMode === 'html5') {
       try { player.pause(); } catch {}
     } else if (playingMode === 'webaudio') {
-      stopWebAudio();
+      pauseWebAudio();
     }
     filter();
+  }
+
+  function pauseWebAudio() {
+    if (!audioCtx) return;
+    const offset = Math.max(0, (audioCtx.currentTime - webStartTime) || 0);
+    if (currentPlayingPath) pausedOffsets.set(currentPlayingPath, Math.min(offset, webDuration || offset));
+    stopWebAudio();
+  }
+
+  async function resumeWebAudio(file) {
+    const off = pausedOffsets.get(file.path) || 0;
+    await startWebAudioAtOffset(file, off);
   }
 
   async function toggleWebAudio(file) {
     // If same file via webaudio and currently playing -> stop
     if (currentPlayingPath === file.path && playingMode === 'webaudio' && currentSource) {
-      stopWebAudio();
+      pauseWebAudio();
       filter();
       return;
     }
@@ -249,30 +247,8 @@
     if (playingMode === 'html5' && !player.paused) player.pause();
 
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    stopWebAudio();
-    let buffer;
-    try {
-      buffer = await decodeBufferForFile(file);
-    } catch (e) {
-      // Fallback to HTML5 if decode fails
-      return toggleHtml5(file);
-    }
-    const src = audioCtx.createBufferSource();
-    src.buffer = buffer;
-    src.connect(audioCtx.destination);
-    src.onended = () => {
-      currentSource = null;
-      if (playingMode === 'webaudio') playingMode = null;
-      filter();
-    };
-    currentPlayingPath = file.path;
-    nowEl.textContent = file.relPath;
-    playingMode = 'webaudio';
-    currentSource = src;
-    try { src.start(0); } catch {}
-    webDuration = buffer.duration || 0;
-    webStartTime = audioCtx.currentTime;
-    ensureRaf();
+    const off = pausedOffsets.get(file.path) || 0;
+    await startWebAudioAtOffset(file, off);
     filter();
   }
 
@@ -300,7 +276,7 @@
   }
 
   // Always (re)start from the beginning using WebAudio
-  async function startWebAudio(file) {
+  async function startWebAudioAtOffset(file, offsetSec) {
     if (playingMode === 'html5' && !player.paused) player.pause();
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     stopWebAudio();
@@ -318,9 +294,11 @@
       nowEl.textContent = file.relPath;
       playingMode = 'webaudio';
       currentSource = src;
-      try { src.start(0); } catch {}
+      const off = Math.max(0, Math.min(buffer.duration || 0, offsetSec || 0));
+      try { src.start(0, off); } catch {}
       webDuration = buffer.duration || 0;
-      webStartTime = audioCtx.currentTime;
+      webStartTime = audioCtx.currentTime - off;
+      pausedOffsets.set(file.path, off);
       ensureRaf();
       filter();
     } catch (e) {
@@ -330,17 +308,21 @@
   }
 
   // Always (re)start from the beginning using HTML5 audio
-  function startHtml5(file) {
+  function startHtml5AtOffset(file, offsetSec) {
     const fileUrl = api.toFileUrl(file.path);
     if (playingMode === 'webaudio') stopWebAudio();
-    if (currentPlayingPath === file.path && playingMode === 'html5') {
-      try { player.currentTime = 0; } catch {}
-      player.play().catch(() => {});
-    } else {
+    if (currentPlayingPath !== file.path || playingMode !== 'html5') {
       player.src = fileUrl;
       currentPlayingPath = file.path;
       nowEl.textContent = file.relPath;
       playingMode = 'html5';
+      player.addEventListener('loadedmetadata', function onlm() {
+        player.removeEventListener('loadedmetadata', onlm);
+        try { player.currentTime = Math.max(0, offsetSec || 0); } catch {}
+        player.play().catch(() => {});
+      });
+    } else {
+      try { player.currentTime = Math.max(0, offsetSec || 0); } catch {}
       player.play().catch(() => {});
     }
     ensureRaf();
@@ -750,6 +732,27 @@
     const m = Math.floor(s / 60);
     const r = s % 60;
     return `${m}:${r.toString().padStart(2,'0')}`;
+  }
+
+  function seekTo(file, frac) {
+    const dur = waveDurations.get(file.path) || 0;
+    const off = Math.max(0, Math.min(dur, (frac || 0) * dur));
+    const canvas = waveCanvases.get(file.path);
+    const peaks = waveCache.get(file.path);
+    if (canvas && peaks) drawWave(canvas, peaks, dur ? off / dur : 0);
+
+    if (currentPlayingPath === file.path) {
+      if (playingMode === 'html5') {
+        try { player.currentTime = off; } catch {}
+      } else if (playingMode === 'webaudio') {
+        startWebAudioAtOffset(file, off);
+      }
+    } else {
+      // If not current, start playback from this offset
+      if ((file.ext || '').toLowerCase().includes('aif')) startWebAudioAtOffset(file, off);
+      else startHtml5AtOffset(file, off);
+    }
+    pausedOffsets.set(file.path, off);
   }
 
   function getProgress() {
