@@ -112,21 +112,21 @@
         align-items: center;
         padding: 8px 12px;
         border-bottom: 1px solid var(--border);
-        cursor: default;
+        cursor: pointer;
         border-radius: 6px;
       }
-      .item:hover { background: rgba(255,255,255,0.03); }
+      .item:hover { background: rgba(79,140,255,0.10); }
       .item.playing { background: rgba(79,140,255,0.15); border-left: 3px solid var(--accent); }
       :root[data-theme="light"] .item.playing { background: rgba(37,99,235,0.12); }
-      :root[data-theme="light"] .item:hover { background: rgba(0,0,0,0.03); }
+      :root[data-theme="light"] .item:hover { background: rgba(37,99,235,0.10); }
       .play {
         width: 20px; height: 20px; border-radius: 50%;
         display: grid; place-items: center;
         color: #fff; background: #2b2f3a; font-size: 12px;
       }
-      .meta { display: flex; flex-direction: column; min-width: 0; }
-      .name { font-weight: 600; white-space: normal; word-break: break-word; }
-      .path { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .meta { display: flex; flex-direction: column; min-width: 0; user-select: none; }
+      .name { font-weight: 600; white-space: normal; word-break: break-word; user-select: none; }
+      .path { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none; }
       .ext { color: var(--muted); font-size: 12px; padding-left: 8px; min-width: 48px; text-align: right; }
       .badges { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; }
       .badge { font-size: 11px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 999px; color: var(--text); background: transparent; }
@@ -141,7 +141,8 @@
       .heart.active { color: #ef4444; }
       :root[data-theme="light"] .heart { color: #0b0f19; }
       :root[data-theme="light"] .heart.active { color: #dc2626; }
-      .wave { width: 100%; height: 72px; cursor: default; }
+      .wave { width: 100%; height: 72px; cursor: pointer; }
+      .meta, .name { cursor: pointer; }
       footer { padding: 8px 12px; border: 1px solid var(--border); border-top: 1px solid var(--border); background: var(--panel); display: grid; gap: 6px; border-radius: 10px; }
       footer { margin-bottom: 10px; } /* extra blank space at bottom */
       #now { color: var(--muted); font-size: 12px; }

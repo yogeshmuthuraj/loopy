@@ -86,6 +86,7 @@
       name.style.cursor = 'pointer';
       name.addEventListener('click', (e) => {
         e.stopPropagation();
+        ensureAudioReady();
         if (isPlaying(file)) stopOrPause(); else playFromStart(file);
       });
 
@@ -99,6 +100,7 @@
       meta.addEventListener('click', (e) => {
         e.stopPropagation();
         if ((e.target instanceof HTMLElement) && e.target.closest('.heart')) return;
+        ensureAudioReady();
         if (isPlaying(file)) stopOrPause(); else playFromStart(file);
       });
 
@@ -137,6 +139,7 @@
       // Waveform click behaves like row/name (no seeking cursor move)
       wave.addEventListener('click', (e) => {
         e.stopPropagation();
+        ensureAudioReady();
         if (isPlaying(file)) stopOrPause(); else playFromStart(file);
       });
       row.appendChild(thumbEl);
@@ -145,9 +148,9 @@
       row.appendChild(timeEl);
       row.appendChild(heart);
 
-      // Set up drag & drop to OS/DAW
-      row.setAttribute('draggable', 'true');
-      row.addEventListener('dragstart', (e) => {
+      // Set up drag & drop to OS/DAW (use thumbnail as drag handle to avoid click interference)
+      thumbEl.setAttribute('draggable', 'true');
+      thumbEl.addEventListener('dragstart', (e) => {
         api.startDrag(file.path);
         e.dataTransfer?.setData('text/uri-list', api.toFileUrl(file.path));
         e.dataTransfer?.setData('text/plain', file.path);
@@ -156,6 +159,7 @@
       // Whole row toggles play/stop, except clicking heart
       row.addEventListener('click', (e) => {
         if ((e.target instanceof HTMLElement) && e.target.closest('.heart')) return;
+        ensureAudioReady();
         if (isPlaying(file)) stopOrPause(); else playFromStart(file);
       });
 
@@ -200,6 +204,7 @@
   }
 
   function playFromStart(file) {
+    ensureAudioReady();
     const ext = file.ext.toLowerCase();
     if (ext === '.aif' || ext === '.aiff') {
       return startWebAudioAtOffset(file, 0);
@@ -238,6 +243,7 @@
   }
 
   async function toggleWebAudio(file) {
+    ensureAudioReady();
     // If same file via webaudio and currently playing -> stop
     if (currentPlayingPath === file.path && playingMode === 'webaudio' && currentSource) {
       pauseWebAudio();
@@ -278,6 +284,7 @@
 
   // Always (re)start from the beginning using WebAudio
   async function startWebAudioAtOffset(file, offsetSec) {
+    ensureAudioReady();
     if (playingMode === 'html5' && !player.paused) player.pause();
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     stopWebAudio();
@@ -310,6 +317,7 @@
 
   // Always (re)start from the beginning using HTML5 audio
   function startHtml5AtOffset(file, offsetSec) {
+    ensureAudioReady();
     const fileUrl = api.toFileUrl(file.path);
     if (playingMode === 'webaudio') stopWebAudio();
     if (currentPlayingPath !== file.path || playingMode !== 'html5') {
@@ -317,17 +325,25 @@
       currentPlayingPath = file.path;
       nowEl.textContent = file.relPath;
       playingMode = 'html5';
+      // Update UI when playback actually starts
+      const onPlayOnce = () => {
+        player.removeEventListener('play', onPlayOnce);
+        filter();
+      };
+      player.addEventListener('play', onPlayOnce);
       player.addEventListener('loadedmetadata', function onlm() {
         player.removeEventListener('loadedmetadata', onlm);
         try { player.currentTime = Math.max(0, offsetSec || 0); } catch {}
         player.play().catch(() => {});
       });
+      // Try immediate play as well (do not rely solely on metadata)
+      player.play().catch(() => {});
     } else {
       try { player.currentTime = Math.max(0, offsetSec || 0); } catch {}
       player.play().catch(() => {});
+      filter();
     }
     ensureRaf();
-    filter();
   }
 
   chooseBtn.addEventListener('click', async () => {
@@ -799,5 +815,12 @@
 
   function ensureRaf() {
     if (!rafId) rafId = requestAnimationFrame(rafTick);
+  }
+
+  function ensureAudioReady() {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioCtx?.resume?.();
+    } catch {}
   }
 })();

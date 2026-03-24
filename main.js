@@ -74,6 +74,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1100,
     height: 700,
+    acceptFirstMouse: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
